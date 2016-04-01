@@ -13,6 +13,7 @@ class Manager:
 
     def setup(self):
         self.resetEvent = Event()
+        self.frameDataEvent = Event()
         self.frameEvent = Event()
 
         self._natnet_version = (2, 7, 0, 0)
@@ -23,6 +24,8 @@ class Manager:
         self.resetEvent(self)
 
     def processFrameData(self, data):
+        self.frameDataEvent(data, self)
+
         packet = rx.unpack(data, version=self._natnet_version)
 
         if type(packet) is rx.SenderData:

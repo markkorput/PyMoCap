@@ -2,12 +2,20 @@
 import _localpaths
 
 from pymocap.manager import Manager
+from pymocap.color_terminal import ColorTerminal
 from pymocap.readers.natnet_file_reader import NatnetFileReader
 from pymocap.writers.osc_writer import OscWriter
 
 import sys, os
 
 default_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test', 'fixtures', 'binary_natnet_frames'))
+
+counter = 0
+
+def onFrame(frame, manager):
+    global counter
+    counter += 1
+    ColorTerminal().blue('Frame count: {0}, frameno: {1}'.format(str(counter), str(frame.frameno)))
 
 # config
 file_path = default_file_path if len(sys.argv) < 2 else sys.argv[1]
@@ -19,6 +27,8 @@ manager = Manager()
 writer = OscWriter(host=osc_host, port=osc_port, manager=manager)
 reader = NatnetFileReader(file_path, manager=manager)
 
+manager.frameEvent += onFrame
+
 # execution loop
 while True:
     try:
@@ -28,3 +38,6 @@ while True:
         reader.update()
     except KeyboardInterrupt:
         break
+
+reader.stop()
+writer.stop()
