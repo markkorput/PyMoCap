@@ -6,14 +6,9 @@ from datetime import datetime
 import struct
 
 class NatnetFileReader:
-    def __init__(self, path, loop=True, manager=None, autoStart=True):
-        # params
-        self.path = path
-        self.loop = loop
-        # self.sync = sync
-        self.manager = manager
-
+    def __init__(self, path, loop=True, manager=None, fps=120, autoStart=True):
         self.setup()
+        self.configure(path=path, fps=fps, loop=loop, manager=manager)
 
         if autoStart == True:
             self.start()
@@ -22,6 +17,13 @@ class NatnetFileReader:
         self.destroy()
 
     def setup(self):
+        self.path = None
+        self.loop = False
+        self.fps = None
+        self._timePerFrame = None
+        self._nextFrameTime = None
+        self.manager = None
+
         self._natnet_version = (2, 7, 0, 0)
 
         # attributes
@@ -36,13 +38,27 @@ class NatnetFileReader:
         self.stop()
 
     def update(self):
+        if self.syncEnabled():
+            # get current playback time
+            t = self.getTime()
+            if t < self._nextFrameTime:
+                # abort, not time for next frame yet
+                return
+
+            # update time for frame after the current frame
+            self._nextFrameTime += self._timePerFrame
+
         data = self._nextFrame()
 
-        if data:
+        if data and self.manager:
             self.manager.processFrameData(data)
 
     def start(self):
         self.stop()
+
+        if not self.path:
+            ColorTerminal().fail("NatnetFileReader - no file specified")
+            return
 
         try:
             self.file = open(self.path, 'rb')
@@ -50,7 +66,7 @@ class NatnetFileReader:
         except:
             ColorTerminal().fail("Could not open file %s" % self.path)
 
-        self.startTime = datetime.now()
+        self._rewind()
         self.startEvent(self)
 
     def stop(self):
@@ -61,14 +77,26 @@ class NatnetFileReader:
         self.startTime = None
         self.stopEvent(self)
 
-    def configure(self, path=None, loop=None):
-        if path: self.path = path
-        if loop: self.loop = loop
+    def configure(self, path=None, fps=None, loop=None, manager=None):
+        if path:
+            self.path = path
 
-        if path and self.isRunning():
-            self.stop()
-            self.start()
+            if self.isRunning():
+                # restart
+                self.stop()
+                self.start()
 
+        if loop:
+            self.loop = loop
+
+        if fps:
+            self.fps = int(fps)
+            self._timePerFrame = 1.0/self.fps
+
+        if manager:
+            self.manager = manager
+
+    # retuns a float value indicating the current playback time in seconds
     def getTime(self):
         if self.startTime is None:
             return 0
@@ -76,6 +104,17 @@ class NatnetFileReader:
 
     def isRunning(self):
         return self.startTime != None
+
+    def syncEnabled(self):
+        return self.fps != None
+
+    def _rewind(self):
+        # reset file handle
+        self.file.seek(0)
+        # reset timer
+        self.startTime = datetime.now()
+        # first frame immediately (if syncing)
+        self._nextFrameTime = 0
 
     def _nextFrame(self):
         s = self._readFrameSize()
@@ -92,25 +131,12 @@ class NatnetFileReader:
 
         # end-of-file?
         if not value:
-            if not self.loop: return None
-            # print('loop')
-            # rewind
-            self.file.seek(0)
-            # reset timer
-            self.startTime = datetime.now()
+            if not self.loop:
+                return None
+
+            self._rewind()
             # try again
             return self._readFrameSize()
 
         # 'unpack' 4 binary bytes into integer
         return struct.unpack('i', value)[0]
-
-    # todo; create raw_binary_writer?
-    def _writeBinaryFrameToFile(self, frame_data):
-        if not hasattr(self, 'raw_binary_file'):
-            self.raw_binary_file = open('data/raw_binary_natnet', 'wb')
-
-        # # size of next block
-        # self.file.write(str(len(frame_data))+'bytes')
-        self.raw_binary_file.write(struct.pack('i', len(frame_data)))
-        # # block
-        self.raw_binary_file.write(frame_data)
