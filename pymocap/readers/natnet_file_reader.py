@@ -8,7 +8,9 @@ import struct
 class FpsSync:
     def __init__(self, fps=120.0):
         self.fps = fps
-        self._dtFrame = 1.0/fps
+        if not self.fps:
+            self.fps = 120.0
+        self._dtFrame = 1.0/self.fps
         self.reset()
 
     def start(self):
