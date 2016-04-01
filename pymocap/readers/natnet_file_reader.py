@@ -5,6 +5,36 @@ from pymocap.event import Event
 from datetime import datetime
 import struct
 
+class FpsSync:
+    def __init__(self, fps=120.0):
+        self.fps = fps
+        self._dtFrame = 1.0/fps
+        self.reset()
+
+    def start(self):
+        self.reset()
+
+    def reset(self):
+        self.startTime = datetime.now()
+        self.frameCount = 0
+        self._nextFrameTime = 0
+
+    def time(self):
+        return (datetime.now()-self.startTime).total_seconds()
+
+    def timeForNewFrame(self):
+        return self.time() >= self._nextFrameTime
+
+    def doFrame(self):
+        self._nextFrameTime += self._dtFrame
+
+    def nextFrame(self):
+        if not self.timeForNewFrame():
+            return False
+
+        self.doFrame()
+        return True
+
 class NatnetFileReader:
     def __init__(self, path, loop=True, manager=None, fps=120, autoStart=True):
         self.setup()
@@ -20,15 +50,14 @@ class NatnetFileReader:
         self.path = None
         self.loop = False
         self.fps = None
-        self._timePerFrame = None
-        self._nextFrameTime = None
         self.manager = None
 
         self._natnet_version = (2, 7, 0, 0)
 
         # attributes
         self.file = None
-        self.startTime = None
+        self._fpsSync = FpsSync(self.fps)
+        self.running = False
 
         self.startEvent = Event()
         self.stopEvent = Event()
@@ -42,14 +71,8 @@ class NatnetFileReader:
             return
 
         if self.syncEnabled():
-            # get current playback time
-            t = self.getTime()
-            if t < self._nextFrameTime:
-                # abort, not time for next frame yet
+            if not self._fpsSync.nextFrame():
                 return
-
-            # update time for frame after the current frame
-            self._nextFrameTime += self._timePerFrame
 
         data = self._nextFrame()
 
@@ -70,6 +93,7 @@ class NatnetFileReader:
             ColorTerminal().fail("Could not open file %s" % self.path)
 
         self._rewind()
+        self.running = True
         self.startEvent(self)
 
     def stop(self):
@@ -77,7 +101,7 @@ class NatnetFileReader:
             self.file.close()
             self.file = None
 
-        self.startTime = None
+        self.running = False
         self.stopEvent(self)
 
     def configure(self, path=None, fps=None, loop=None, manager=None):
@@ -94,19 +118,17 @@ class NatnetFileReader:
 
         if fps:
             self.fps = int(fps)
-            self._timePerFrame = 1.0/self.fps
+            self._fpsSync = FpsSync(self.fps)
 
         if manager:
             self.manager = manager
 
     # retuns a float value indicating the current playback time in seconds
     def getTime(self):
-        if self.startTime is None:
-            return 0
-        return (datetime.now()-self.startTime).total_seconds()
+        return self._fpsSync.time()
 
     def isRunning(self):
-        return self.startTime != None
+        return self.running
 
     def syncEnabled(self):
         return self.fps != None
@@ -115,9 +137,7 @@ class NatnetFileReader:
         # reset file handle
         self.file.seek(0)
         # reset timer
-        self.startTime = datetime.now()
-        # first frame immediately (if syncing)
-        self._nextFrameTime = 0
+        self._fpsSync.reset()
 
     def _nextFrame(self):
         s = self._readFrameSize()
