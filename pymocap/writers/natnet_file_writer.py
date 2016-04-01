@@ -37,6 +37,8 @@ class NatnetFileWriter:
 
         self.connectEvent = Event()
         self.disconnectEvent = Event()
+        self.frameCount = 0
+        self.frameEvent = Event()
 
     def destroy(self):
         self.stop()
@@ -73,6 +75,8 @@ class NatnetFileWriter:
     def _onFrameData(self, data, manager):
         if self.running:
             self._writeBinaryFrameToFile(data)
+            self.frameCount += 1
+            self.frameEvent(self)
 
     def _writeBinaryFrameToFile(self, frame_data):
         # format;
@@ -81,6 +85,6 @@ class NatnetFileWriter:
         # followed by the next frame
 
         # write 4-byte binary integer; size of the frame data
-        self.raw_binary_file.write(struct.pack('i', len(frame_data)))
+        self.file.write(struct.pack('i', len(frame_data)))
         # write binary frame data
-        self.raw_binary_file.write(frame_data)
+        self.file.write(frame_data)
