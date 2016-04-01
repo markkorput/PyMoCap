@@ -28,3 +28,6 @@ while True:
         reader.update()
     except KeyboardInterrupt:
         break
+
+reader.stop()
+writer.stop()
