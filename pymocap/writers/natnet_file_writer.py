@@ -64,6 +64,7 @@ class NatnetFileWriter:
     def start(self):
         self.file = open(self.path, 'wb')
         self.running = True
+        self.startTime = datetime.now()
 
     def stop(self):
         if self.file:
@@ -71,6 +72,9 @@ class NatnetFileWriter:
             self.file = None
 
         self.running = False
+
+    def _time(self):
+        return (datetime.now() - self.startTime).total_seconds()
 
     def _onFrameData(self, data, manager):
         if self.running:
@@ -81,10 +85,13 @@ class NatnetFileWriter:
     def _writeBinaryFrameToFile(self, frame_data):
         # format;
         # 4-bytes binary integer indicating the size of the (binary) frame data
+        # 4-byte binary float indicating timestamp (in seconds) of the frame
         # followed by the binary frame data
         # followed by the next frame
 
         # write 4-byte binary integer; size of the frame data
         self.file.write(struct.pack('i', len(frame_data)))
+        # write 4-byte binary float; timestamp in seconds
+        self.file.write(struct.pack('f', self._time()))
         # write binary frame data
         self.file.write(frame_data)

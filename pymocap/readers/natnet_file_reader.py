@@ -142,7 +142,8 @@ class NatnetFileReader:
         self._fpsSync.reset()
 
     def _nextFrame(self):
-        s = self._readFrameSize()
+        s = self._readFrameSize() # int: bytes
+        t = self._readFrameTime() # float: seconds
 
         if s == None:
             return None
@@ -165,3 +166,15 @@ class NatnetFileReader:
 
         # 'unpack' 4 binary bytes into integer
         return struct.unpack('i', value)[0]
+
+    def _readFrameTime(self):
+        # float of 4 bytes
+        value = self.file.read(4)
+
+        # end-of-file?
+        if not value:
+            # TODO; raise format error?
+            return None
+
+        # 'unpack' 4 binary bytes into float
+        return struct.unpack('f', value)[0]
