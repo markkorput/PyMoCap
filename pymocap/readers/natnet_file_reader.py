@@ -38,6 +38,9 @@ class NatnetFileReader:
         self.stop()
 
     def update(self):
+        if not self.isRunning():
+            return
+
         if self.syncEnabled():
             # get current playback time
             t = self.getTime()
