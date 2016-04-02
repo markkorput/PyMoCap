@@ -18,7 +18,8 @@ class NatnetFile:
 
         # last read frame info
         self.currentFrame = None
-        self.currentTime = None
+        self.currentFrameTime = None
+        self.currentFrameIndex = -1
 
         # events
         self.loopEvent = Event()
@@ -60,12 +61,14 @@ class NatnetFile:
 
     def nextFrame(self):
         bytecount = self._readFrameSize() # int: bytes
-        self.currentTime = self._readFrameTime() # float: seconds
+        self.currentFrameTime = self._readFrameTime() # float: seconds
 
-        if bytecount == None or self.currentTime == None:
+        if bytecount == None or self.currentFrameTime == None:
             return None
 
         self.currentFrame = self.read_file.read(bytecount)
+        self.currentFrameIndex += 1
+
         return self.currentFrame
 
     def _readFrameSize(self):
@@ -79,6 +82,9 @@ class NatnetFile:
 
             # reset file handle
             self.read_file.seek(0)
+            self.currentFrame = None
+            self.currentFrameTime = None
+            self.currentFrameIndex = -1
             # notify
             self.loopEvent(self)
             # try again
