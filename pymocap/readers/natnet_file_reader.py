@@ -6,6 +6,8 @@ from pymocap.fps_sync import FpsSync
 
 class NatnetFileReader:
     def __init__(self, options = {}):
+        self.options = {}
+        self.natnet_file = NatnetFile()
         self.manager = Manager()
         self.running = False
         self.configure(options)
@@ -40,17 +42,11 @@ class NatnetFileReader:
         self.startEvent(self)
 
     def stop(self):
-        self.natnet_file.stop()
+        self.natnet_file.stopReading()
         self.running = False
         self.stopEvent(self)
 
     def configure(self, options):
-        if not hasattr(self, 'options'):
-            self.options = {}
-
-        if not hasattr(self, 'natnet_file'):
-            self.natnet_file = NatnetFile()
-
         previous_options = self.options
         self.options = dict(previous_options.items() + options.items())
 

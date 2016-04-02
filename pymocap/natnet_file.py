@@ -1,16 +1,20 @@
 from pymocap.color_terminal import ColorTerminal
 from pymocap.event import Event
 
-import struct
+import struct, os
+from datetime import datetime
 
 class NatnetFile:
     def __init__(self, path=None, loop=True):
         self.path = path
         self.loop = loop
 
+        if not self.path:
+            self.path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'natnet_'+datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+'.binary'))
+
         # file handles
         self.read_file = None
-        # self.write_file = None
+        self.write_file = None
 
         # last read frame info
         self.currentFrame = None
@@ -33,6 +37,20 @@ class NatnetFile:
         if self.read_file:
             self.read_file.close()
             self.read_file = None
+
+    def startWriting(self):
+        self.stopWriting()
+        try:
+            self.write_file = open(self.path, 'wb')
+            ColorTerminal().success("NatnetFile opened file for writing: %s" % self.path)
+        except:
+            ColorTerminal().fail("NatnetFile couldn't open file for writing: %s" % self.path)
+            self.write_file = None
+
+    def stopWriting(self):
+        if self.write_file:
+            self.write_file.close()
+            self.write_file = None
 
     def stop(self):
         self.stopReading()
@@ -80,3 +98,17 @@ class NatnetFile:
 
         # 'unpack' 4 binary bytes into float
         return struct.unpack('f', value)[0]
+
+    def writeFrame(self, frameData, time=0.0):
+        # frame format;
+        # 4-bytes binary integer indicating the size of the (binary) frame data
+        # 4-byte binary float indicating timestamp (in seconds) of the frame
+        # followed by the binary frame data
+        # [next frame]
+
+        # write 4-byte binary integer; size of the frame data
+        self.write_file.write(struct.pack('i', len(frameData)))
+        # write 4-byte binary float; timestamp in seconds
+        self.write_file.write(struct.pack('f', time))
+        # write binary frame data
+        self.write_file.write(frameData)

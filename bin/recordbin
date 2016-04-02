@@ -19,7 +19,7 @@ def onFrameRecorded(natnet_writer):
 
 # initialize
 manager = Manager()
-writer = NatnetFileWriter(path=file_path, manager=manager)
+writer = NatnetFileWriter({'path':file_path, 'manager':manager})
 reader = NatnetReader(manager=manager, host=natnet_host, multicast=natnet_multicast, port=natnet_port)
 
 writer.frameEvent += onFrameRecorded
