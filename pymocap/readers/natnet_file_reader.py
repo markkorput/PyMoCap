@@ -6,10 +6,12 @@ from pymocap.natnet_file import NatnetFile
 from datetime import datetime
 
 class FpsSync:
-    def __init__(self, fps=120.0):
+    def __init__(self, fps=None):
         self.fps = fps
+
         if not self.fps:
             self.fps = 120.0
+
         self._dtFrame = 1.0/self.fps
         self.reset()
 
@@ -38,31 +40,21 @@ class FpsSync:
         return True
 
 class NatnetFileReader:
-    def __init__(self, path=None, loop=True, manager=None, fps=120, autoStart=True):
-        self.natnet_file = NatnetFile(path=path, loop=loop)
-        self.fps = None
-        self.manager = None
-
-        self._natnet_version = (2, 7, 0, 0)
-
-        # attributes
-        self._fpsSync = FpsSync(self.fps)
+    def __init__(self, options = {}):
+        self.manager = Manager()
         self.running = False
+        self.configure(options)
 
         # events
         self.startEvent = Event()
         self.stopEvent = Event()
         self.updateEvent = Event()
 
-        self.configure(fps=fps, manager=manager)
-
-        if autoStart == True:
+        # autoStart is True by default
+        if not 'autoStart' in options or options['autoStart']:
             self.start()
 
     def __del__(self):
-        self.destroy()
-
-    def destroy(self):
         self.stop()
 
     def update(self):
@@ -88,24 +80,32 @@ class NatnetFileReader:
         self.running = False
         self.stopEvent(self)
 
-    def configure(self, path=None, fps=None, loop=None, manager=None):
-        if loop:
-            self.natnet_file.setLoop(loop)
+    def configure(self, options):
+        if not hasattr(self, 'options'):
+            self.options = {}
 
-        if path:
-            self.natnet_file = NatnetFile(path, loop=self.natnet_file.loop)
+        if not hasattr(self, 'natnet_file'):
+            self.natnet_file = NatnetFile()
+
+        previous_options = self.options
+        self.options = dict(previous_options.items() + options.items())
+
+        if 'loop' in options:
+            self.natnet_file.setLoop(options['loop'])
+
+        if 'path' in options:
+            self.natnet_file = NatnetFile(options['path'], loop=self.natnet_file.loop)
 
             if self.isRunning():
                 # restart
                 self.stop()
                 self.start()
 
-        if fps:
-            self.fps = int(fps)
-            self._fpsSync = FpsSync(self.fps)
+        if 'fps' in options:
+            self._fpsSync = FpsSync(options['fps'])
 
-        if manager:
-            self.manager = manager
+        if 'manager' in options:
+            self.manager = options['manager']
 
     # retuns a float value indicating the current playback time in seconds
     def getTime(self):
@@ -115,4 +115,5 @@ class NatnetFileReader:
         return self.running
 
     def syncEnabled(self):
-        return self.fps != None
+        # enabled if fps option was set explicitly
+        return True if 'fps' in self.options else False

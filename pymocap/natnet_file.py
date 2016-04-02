@@ -31,7 +31,7 @@ class NatnetFile:
 
     def stopReading(self):
         if self.read_file:
-            self.read_file.stop()
+            self.read_file.close()
             self.read_file = None
 
     def stop(self):
