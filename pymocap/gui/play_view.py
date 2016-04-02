@@ -64,9 +64,10 @@ class PlayView:
         self.time_label.configure(text='stopped')
 
     def updateStatus(self, reader):
+        self.file_label.configure(text=reader.natnet_file.path)
+
         if reader.isRunning():
             self.startstop_button.configure(text='Stop')
-            self.file_label.configure(text=reader.natnet_file.path)
         else:
             self.startstop_button.configure(text='Play')
 
