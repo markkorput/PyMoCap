@@ -11,40 +11,36 @@ import threading
 
 class NatnetReader:
     def __init__(self, host='0.0.0.0', multicast=None, port=1511, manager=None, threaded=False, autoStart=True):
+        # configuration
         self.host = host
         self.multicast = multicast
         self.port = port
         self.manager = manager
         self.threaded = threaded
 
-        self.setup()
+        # networking attributes
+        self.connected = False
+        self.dsock = None
+        self.connection_status = None
+
+        # threading attributes
+        self.thread = threading.Thread(target=self._threaded_main)
+        self._kill = False
+
+        # events
+        self.connectionLostEvent = Event()
+        self.connectEvent = Event()
+        self.connectionStatusUpdateEvent = Event()
 
         if autoStart:
             self.start()
 
     def __del__(self):
-        self.destroy()
-
-    def setup(self):
-        self._natnet_version = (2, 7, 0, 0)
-        self.connected = False
-        self.dsock = None
-        self.connection_status = None
-
-        self.connectionLostEvent = Event()
-        self.connectEvent = Event()
-        self.connectionStatusUpdateEvent = Event()
-        self.frameDataEvent = Event()
-
-        self.thread = threading.Thread(target=self._threaded_main)
-        self._kill = False
-
-    def destroy(self):
         self.stop()
 
     def update(self):
         if not self.dsock:
-            # we need a connction to do anything
+            # we need a connection to do anything
             return
 
         try:

@@ -16,7 +16,7 @@ osc_port = 8080 if len(sys.argv) < 6 else sys.argv[5]
 
 # initialize
 manager = Manager()
-writer = OscWriter(host=osc_host, port=osc_port, manager=manager)
+writer = OscWriter({'host':osc_host, 'port':osc_port, 'manager':manager})
 reader = NatnetReader(manager=manager, host=natnet_host, multicast=natnet_multicast, port=natnet_port)
 
 # execution loop

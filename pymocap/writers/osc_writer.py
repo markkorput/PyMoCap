@@ -10,38 +10,46 @@ except ImportError:
     import pymocap.dependencies.OSC as OSC
 
 class OscWriter:
-    def __init__(self, host="127.0.0.1", port=8080, manager=None, autoStart=True):
-        self.configure(host=host, port=port, manager=manager)
-        self.setup()
-
-        if autoStart == True:
-            self.start()
-
-    def __del__(self):
-        self.destroy()
-
-    def setup(self):
+    def __init__(self, options = {}):
+        # attributes
         self.client = None
         self.running = False
         self.connected = False
 
+        # events
         self.connectEvent = Event()
         self.disconnectEvent = Event()
 
-    def destroy(self):
+        # configuration
+        self.options = {}
+        self.configure(options)
+
+        # autoStart is True by default
+        if not 'autoStart' in options or options['autoStart']:
+            self.start()
+
+    def __del__(self):
         self.stop()
 
-    def configure(self, host=None, port=None, manager=None):
-        if host:
-            self.host = host
-        if port:
-            self.port = port
-        if manager:
-            self._setManager(manager)
+    def configure(self, options):
+        # we might need the overwritten options
+        previous_options = self.options
+        # overwrite/update configuration
+        self.options = dict(previous_options.items() + options.items())
 
-        if (host or port) and hasattr(self, 'running') and self.running:
+        # new host or port configs? We need to reconnect, but only if we're running
+        if ('host' in options or 'port' in options) and self.running:
             self.stop()
             self.start()
+
+        # new manager? register callback
+        if 'manager' in options:
+            # unregister from previous manager if we had one
+            if 'manager' in previous_options and previous_options['manager']:
+                previous_options['manager'].frameEvent -= self._onFrame
+            # register callback on new manager
+            if options['manager']: # could also be None if caller is UNsetting the manager
+                options['manager'].frameEvent += self._onFrame
 
     def start(self):
         if self._connect():
@@ -51,16 +59,24 @@ class OscWriter:
         self._disconnect()
         self.running = False
 
+    def port(self):
+        # default is 8080
+        return int(self.options['port']) if 'port' in self.options else 8080
+
+    def host(self):
+        # default is localhost
+        return self.options['host'] if 'host' in self.options else '127.0.0.1'
+
     def _connect(self):
         try:
             self.client = OSC.OSCClient()
-            self.client.connect((self.host, int(self.port)))
+            self.client.connect((self.host(), self.port()))
         except OSC.OSCClientError as err:
             ColorTerminal().error("OSC connection failure: {0}".format(err))
             return False
 
         self.connected = True
-        ColorTerminal().success("OSC client connected to " + self.host + ':' + str(self.port))
+        ColorTerminal().success("OSC client connected to " + self.host() + ':' + str(self.port()))
         self.connectEvent(self)
         return True
 
@@ -72,28 +88,18 @@ class OscWriter:
             ColorTerminal().success("OSC client closed")
             self.disconnectEvent(self)
 
-    def _setManager(self, manager):
-        if hasattr(self, 'manager') and self.manager:
-            self.manager.frameEvent -= self.onFrame
+    # callback, called when manager gets a new frame of mocap data
+    def _onFrame(self, frame, manager):
+        if not self.running: return
 
-        self.manager = manager
-
-        if self.manager: # could also be None
-            self.manager.frameEvent += self.onFrame
-
-    def onFrame(self, frame, manager):
-        if not self.running:
-            return
-
+        # sound out OSC message for every rigid body in the frame
         for rb in frame.rigid_bodies:
-            obj = {
+            self._sendMessage('/rigidbody', json.dumps({
                 'id': rb.id,
                 # 'name': rb.name,
                 'position': rb.position,
                 'orientation': rb.orientation
-            }
-
-            self._sendMessage('/rigidbody', json.dumps(obj))
+            }))
 
     def _sendMessage(self, tag, content):
         msg = OSC.OSCMessage()
@@ -106,4 +112,4 @@ class OscWriter:
             pass
             # ColorTerminal().warn("OSC failure: {0}".format(err))
             # no need to call connect again on the client, it will automatically
-            # try to connect when we send ou next message
+            # try to connect when we send the next message

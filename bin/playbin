@@ -23,10 +23,10 @@ file_path = default_file_path if len(sys.argv) < 2 else sys.argv[1]
 osc_host = '127.0.0.1' if len(sys.argv) < 3 else sys.argv[2]
 osc_port = 8080 if len(sys.argv) < 4 else sys.argv[3]
 
-# initialize all departments
+# initialize all modules
 manager = Manager()
 manager.frameEvent += onFrame
-writer = OscWriter(host=osc_host, port=osc_port, manager=manager)
+writer = OscWriter({'host':osc_host, 'port':osc_port, 'manager':manager})
 reader = NatnetFileReader({'path': file_path, 'manager': manager, 'autoStart': False})
 # uncomment the following line to re-record all frames into a new file
 # writer = NatnetFileWriter({'manager': manager})
