@@ -10,7 +10,7 @@ class TestNatnetFileReader(unittest.TestCase):
     def setUp(self):
         self.file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'fixtures', 'binary_natnet_frames'))
         self.manager = Manager()
-        self.reader = NatnetFileReader(self.file_path, manager=self.manager)
+        self.reader = NatnetFileReader({'path': self.file_path, 'manager': self.manager})
 
     def test_initial_frame(self):
         # before
