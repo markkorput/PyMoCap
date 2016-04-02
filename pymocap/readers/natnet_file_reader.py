@@ -1,4 +1,4 @@
-from pymocap.color_terminal import ColorTerminal
+# from pymocap.color_terminal import ColorTerminal
 from pymocap.manager import Manager
 from pymocap.event import Event
 from pymocap.natnet_file import NatnetFile
