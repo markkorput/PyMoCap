@@ -1,4 +1,4 @@
-from pymocap.color_terminal import ColorTerminal
+# from pymocap.color_terminal import ColorTerminal
 from pymocap.manager import Manager
 from pymocap.event import Event
 from pymocap.natnet_file import NatnetFile
@@ -86,11 +86,13 @@ class NatnetFileReader:
             self.natnet_file.setLoop(options['loop'])
 
         if 'path' in options:
+            active = self.isRunning()
+            if active:
+                self.stop()
+
             self.natnet_file = NatnetFile(options['path'], loop=self.natnet_file.loop)
 
-            if self.isRunning():
-                # restart
-                self.stop()
+            if active:
                 self.start()
 
         if 'fps' in options:
