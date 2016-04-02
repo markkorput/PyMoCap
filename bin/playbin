@@ -8,7 +8,7 @@ from pymocap.writers.osc_writer import OscWriter
 
 import sys, os
 
-default_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test', 'fixtures', 'binary_natnet_frames'))
+default_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'walk-198frames.binary.recording'))
 
 counter = 0
 

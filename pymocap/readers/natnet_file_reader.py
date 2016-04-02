@@ -1,9 +1,9 @@
 from pymocap.color_terminal import ColorTerminal
 from pymocap.manager import Manager
 from pymocap.event import Event
+from pymocap.natnet_file import NatnetFile
 
 from datetime import datetime
-import struct
 
 class FpsSync:
     def __init__(self, fps=120.0):
@@ -38,32 +38,29 @@ class FpsSync:
         return True
 
 class NatnetFileReader:
-    def __init__(self, path, loop=True, manager=None, fps=120, autoStart=True):
-        self.setup()
-        self.configure(path=path, fps=fps, loop=loop, manager=manager)
-
-        if autoStart == True:
-            self.start()
-
-    def __del__(self):
-        self.destroy()
-
-    def setup(self):
-        self.path = None
-        self.loop = False
+    def __init__(self, path=None, loop=True, manager=None, fps=120, autoStart=True):
+        self.natnet_file = NatnetFile(path=path, loop=loop)
         self.fps = None
         self.manager = None
 
         self._natnet_version = (2, 7, 0, 0)
 
         # attributes
-        self.file = None
         self._fpsSync = FpsSync(self.fps)
         self.running = False
 
+        # events
         self.startEvent = Event()
         self.stopEvent = Event()
         self.updateEvent = Event()
+
+        self.configure(fps=fps, manager=manager)
+
+        if autoStart == True:
+            self.start()
+
+    def __del__(self):
+        self.destroy()
 
     def destroy(self):
         self.stop()
@@ -76,47 +73,32 @@ class NatnetFileReader:
             if not self._fpsSync.nextFrame():
                 return
 
-        data = self._nextFrame()
+        data = self.natnet_file.nextFrame()
 
         if data and self.manager:
             self.manager.processFrameData(data)
 
     def start(self):
-        self.stop()
-
-        if not self.path:
-            ColorTerminal().fail("NatnetFileReader - no file specified")
-            return
-
-        try:
-            self.file = open(self.path, 'rb')
-            ColorTerminal().success("Opened file %s" % self.path)
-        except:
-            ColorTerminal().fail("Could not open file %s" % self.path)
-
-        self._rewind()
+        self.natnet_file.startReading()
         self.running = True
         self.startEvent(self)
 
     def stop(self):
-        if self.file:
-            self.file.close()
-            self.file = None
-
+        self.natnet_file.stop()
         self.running = False
         self.stopEvent(self)
 
     def configure(self, path=None, fps=None, loop=None, manager=None):
+        if loop:
+            self.natnet_file.setLoop(loop)
+
         if path:
-            self.path = path
+            self.natnet_file = NatnetFile(path, loop=self.natnet_file.loop)
 
             if self.isRunning():
                 # restart
                 self.stop()
                 self.start()
-
-        if loop:
-            self.loop = loop
 
         if fps:
             self.fps = int(fps)
@@ -134,47 +116,3 @@ class NatnetFileReader:
 
     def syncEnabled(self):
         return self.fps != None
-
-    def _rewind(self):
-        # reset file handle
-        self.file.seek(0)
-        # reset timer
-        self._fpsSync.reset()
-
-    def _nextFrame(self):
-        s = self._readFrameSize() # int: bytes
-        t = self._readFrameTime() # float: seconds
-
-        if s == None:
-            return None
-
-        # print('size', s)
-        return self.file.read(s)
-
-    def _readFrameSize(self):
-        # int is 4 bytes
-        value = self.file.read(4)
-
-        # end-of-file?
-        if not value:
-            if not self.loop:
-                return None
-
-            self._rewind()
-            # try again
-            return self._readFrameSize()
-
-        # 'unpack' 4 binary bytes into integer
-        return struct.unpack('i', value)[0]
-
-    def _readFrameTime(self):
-        # float of 4 bytes
-        value = self.file.read(4)
-
-        # end-of-file?
-        if not value:
-            # TODO; raise format error?
-            return None
-
-        # 'unpack' 4 binary bytes into float
-        return struct.unpack('f', value)[0]
