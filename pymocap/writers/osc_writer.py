@@ -11,13 +11,16 @@ except ImportError:
 
 class OscWriter:
     def __init__(self, options = {}):
+        # attributes
         self.client = None
         self.running = False
         self.connected = False
 
+        # events
         self.connectEvent = Event()
         self.disconnectEvent = Event()
 
+        # configuration
         self.options = {}
         self.configure(options)
 
@@ -29,7 +32,9 @@ class OscWriter:
         self.stop()
 
     def configure(self, options):
+        # we might need the overwritten options
         previous_options = self.options
+        # overwrite/update configuration
         self.options = dict(previous_options.items() + options.items())
 
         # new host or port configs? We need to reconnect, but only if we're running
@@ -39,12 +44,12 @@ class OscWriter:
 
         # new manager? register callback
         if 'manager' in options:
-            # unregister from any previous manager
+            # unregister from previous manager if we had one
             if 'manager' in previous_options and previous_options['manager']:
-                previous_options['manager'].frameEvent -= self.onFrame
+                previous_options['manager'].frameEvent -= self._onFrame
             # register callback on new manager
-            if options['manager']: # could also be None
-                options['manager'].frameEvent += self.onFrame
+            if options['manager']: # could also be None if caller is UNsetting the manager
+                options['manager'].frameEvent += self._onFrame
 
     def start(self):
         if self._connect():
@@ -53,6 +58,14 @@ class OscWriter:
     def stop(self):
         self._disconnect()
         self.running = False
+
+    def port(self):
+        # default is 8080
+        return int(self.options['port']) if 'port' in self.options else 8080
+
+    def host(self):
+        # default is localhost
+        return self.options['host'] if 'host' in self.options else '127.0.0.1'
 
     def _connect(self):
         try:
@@ -75,26 +88,18 @@ class OscWriter:
             ColorTerminal().success("OSC client closed")
             self.disconnectEvent(self)
 
-    def port(self):
-        # default is 8080
-        return int(self.options['port']) if 'port' in self.options else 8080
+    # callback, called when manager gets a new frame of mocap data
+    def _onFrame(self, frame, manager):
+        if not self.running: return
 
-    def host(self):
-        return self.options['host'] if 'host' in self.options else '127.0.0.1'
-
-    def onFrame(self, frame, manager):
-        if not self.running:
-            return
-
+        # sound out OSC message for every rigid body in the frame
         for rb in frame.rigid_bodies:
-            obj = {
+            self._sendMessage('/rigidbody', json.dumps({
                 'id': rb.id,
                 # 'name': rb.name,
                 'position': rb.position,
                 'orientation': rb.orientation
-            }
-
-            self._sendMessage('/rigidbody', json.dumps(obj))
+            }))
 
     def _sendMessage(self, tag, content):
         msg = OSC.OSCMessage()
@@ -107,4 +112,4 @@ class OscWriter:
             pass
             # ColorTerminal().warn("OSC failure: {0}".format(err))
             # no need to call connect again on the client, it will automatically
-            # try to connect when we send ou next message
+            # try to connect when we send the next message

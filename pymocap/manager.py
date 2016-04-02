@@ -9,21 +9,22 @@ except ImportError:
 
 class Manager:
     def __init__(self):
-        self.setup()
-
-    def setup(self):
+        # events
         self.resetEvent = Event()
         self.frameDataEvent = Event()
         self.frameEvent = Event()
 
+        # for natnet data unpacking
         self._natnet_version = (2, 7, 0, 0)
-        self.reset()
+        self.reset(False)
 
-    def reset(self):
+    # resets the current state of the manager (removes current frames and thus all rigid bodies)
+    def reset(self, notify=True):
         self.frame = None
-        self.resetEvent(self)
+        if notify:
+            self.resetEvent(self)
 
-    # take raw, binary, packed natnet frame data
+    # takes raw, binary, packed natnet frame data
     # it unpacks the data, stores it without further processing
     # and triggers notification
     def processFrameData(self, data):
