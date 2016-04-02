@@ -38,7 +38,14 @@ class NatnetFileReader:
 
         # frame-syncing enabled?
         if self.frameSyncEnabled():
-            t = self.getTime()
+            # this the first frame?
+            if self.natnet_file.currentFrameIndex == 0:
+                # use first frame's timestamp as time-shift correction
+                # basically we're cutting all the delay from the start of
+                # the recording until the first frame
+                self.frameSyncTimeShift = self.natnet_file.currentFrameTime
+
+            t = self.getTime() + self.frameSyncTimeShift
 
             # NatnetFile keeps timestamp of last read frame
             if t < self.natnet_file.currentFrameTime:
@@ -60,6 +67,7 @@ class NatnetFileReader:
         self.natnet_file.loopEvent += self._onLoop
         self.running = True
         self.waitingForFrameSync = False
+        self.frameSyncTimeShift = 0.0
         self._fpsSync.reset()
         self.natnet_file.startReading()
         self.startEvent(self)
