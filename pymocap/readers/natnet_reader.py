@@ -34,7 +34,6 @@ class NatnetReader:
         self.connectionLostEvent = Event()
         self.connectEvent = Event()
         self.connectionStatusUpdateEvent = Event()
-        self.frameDataEvent = Event()
 
         self.thread = threading.Thread(target=self._threaded_main)
         self._kill = False

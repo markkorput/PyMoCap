@@ -10,17 +10,7 @@ except ImportError:
     import pymocap.dependencies.OSC as OSC
 
 class OscWriter:
-    def __init__(self, host="127.0.0.1", port=8080, manager=None, autoStart=True):
-        self.configure(host=host, port=port, manager=manager)
-        self.setup()
-
-        if autoStart == True:
-            self.start()
-
-    def __del__(self):
-        self.destroy()
-
-    def setup(self):
+    def __init__(self, options = {}):
         self.client = None
         self.running = False
         self.connected = False
@@ -28,20 +18,33 @@ class OscWriter:
         self.connectEvent = Event()
         self.disconnectEvent = Event()
 
-    def destroy(self):
+        self.options = {}
+        self.configure(options)
+
+        # autoStart is True by default
+        if not 'autoStart' in options or options['autoStart']:
+            self.start()
+
+    def __del__(self):
         self.stop()
 
-    def configure(self, host=None, port=None, manager=None):
-        if host:
-            self.host = host
-        if port:
-            self.port = port
-        if manager:
-            self._setManager(manager)
+    def configure(self, options):
+        previous_options = self.options
+        self.options = dict(previous_options.items() + options.items())
 
-        if (host or port) and hasattr(self, 'running') and self.running:
+        # new host or port configs? We need to reconnect, but only if we're running
+        if ('host' in options or 'port' in options) and self.running:
             self.stop()
             self.start()
+
+        # new manager? register callback
+        if 'manager' in options:
+            # unregister from any previous manager
+            if 'manager' in previous_options and previous_options['manager']:
+                previous_options['manager'].frameEvent -= self.onFrame
+            # register callback on new manager
+            if options['manager']: # could also be None
+                options['manager'].frameEvent += self.onFrame
 
     def start(self):
         if self._connect():
@@ -54,13 +57,13 @@ class OscWriter:
     def _connect(self):
         try:
             self.client = OSC.OSCClient()
-            self.client.connect((self.host, int(self.port)))
+            self.client.connect((self.host(), self.port()))
         except OSC.OSCClientError as err:
             ColorTerminal().error("OSC connection failure: {0}".format(err))
             return False
 
         self.connected = True
-        ColorTerminal().success("OSC client connected to " + self.host + ':' + str(self.port))
+        ColorTerminal().success("OSC client connected to " + self.host() + ':' + str(self.port()))
         self.connectEvent(self)
         return True
 
@@ -72,14 +75,12 @@ class OscWriter:
             ColorTerminal().success("OSC client closed")
             self.disconnectEvent(self)
 
-    def _setManager(self, manager):
-        if hasattr(self, 'manager') and self.manager:
-            self.manager.frameEvent -= self.onFrame
+    def port(self):
+        # default is 8080
+        return int(self.options['port']) if 'port' in self.options else 8080
 
-        self.manager = manager
-
-        if self.manager: # could also be None
-            self.manager.frameEvent += self.onFrame
+    def host(self):
+        return self.options['host'] if 'host' in self.options else '127.0.0.1'
 
     def onFrame(self, frame, manager):
         if not self.running:
