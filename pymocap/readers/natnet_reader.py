@@ -21,7 +21,7 @@ class NatnetReader:
         # networking attributes
         self.connected = False
         self.dsock = None
-        self.connection_status = None
+        self.connection_error = None
 
         # threading attributes
         self.thread = threading.Thread(target=self._threaded_main)
@@ -48,17 +48,17 @@ class NatnetReader:
         except Exception as e:
             # error: [Errno 35] Resource temporarily unavailable
             # print('socket receive err: ', e.strerror)
-            if self.connection_status != e.strerror:
-                self.connection_status = e.strerror
+            if self.connection_error != e.strerror:
+                self.connection_error = e.strerror
                 self.connectionStatusUpdateEvent(self)
 
             # connection issue, abort
             return
 
         # getting here, means there was no issue with connection
-        if self.connection_status != None:
+        if self.connection_error != None:
             # change connection status back to normal (None)
-            self.connection_status = None
+            self.connection_error = None
             # send notifications
             self.connectionStatusUpdateEvent(self)
 
@@ -87,9 +87,12 @@ class NatnetReader:
             self._kill = True
 
     def configure(self, host=None, multicast=None, port=None):
-        if host: self.host = host
-        if multicast: self.multicast = multicast
-        if port: self.port = port
+        if host:
+            self.host = host
+        if multicast:
+            self.multicast = multicast
+        if port:
+            self.port = port
 
         # if connection is active; reconnect with new configuration
         if (host or port or multicast) and self.connected:
