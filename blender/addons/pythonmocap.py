@@ -44,11 +44,12 @@ class PyMoCap:
         global manager
         self.owner = owner
         self.config = bpy.data.objects[self.owner.name].pyMoCapConfig
+        self.natnet_file_config = bpy.data.objects[self.owner.name].pyMoCapNatnetFileConfig
         self.manager = manager
-        self.reader = NatnetFileReader({'path': self.config.file, 'manager': self.manager, 'loop': self.config.loop, 'autoStart': self.config.enabled})
+        self.reader = NatnetFileReader({'path': self.natnet_file_config.file, 'manager': self.manager, 'loop': self.natnet_file_config.loop, 'autoStart': self.natnet_file_config.enabled})
 
     def update(self):
-        if self.config.enabled:
+        if self.natnet_file_config.enabled:
             self.reader.update()
             print("NatnetFileReader time: {0}".format(self.reader.getTime()))
 
@@ -71,9 +72,14 @@ class Panel(bpy.types.Panel):
         config = context.object.pyMoCapConfig
 
         if config.enabled == True:
-            layout.row().prop(config, "file")
-            layout.row().prop(config, "loop")
-            layout.row().prop(config, "sync")
+            natnet_file_config = context.object.pyMoCapNatnetFileConfig
+            r = layout.row()
+            r.prop(natnet_file_config, 'enabled', text='Natnet File Reader')
+            if natnet_file_config.enabled:
+                layout.row().prop(natnet_file_config, "file")
+                r = layout.row()
+                r.prop(natnet_file_config, "loop")
+                r.prop(natnet_file_config, "sync")
 
             obj = PyMoCapObj(context.object)
             # game logic connection not complete; inform user and provide
@@ -189,9 +195,21 @@ class Config(bpy.types.PropertyGroup):
 
     # Add in the properties
     cls.enabled = bpy.props.BoolProperty(name="enabled", default=False, description="Enable PyMoCap")
-    cls.file = bpy.props.StringProperty(name="file", default="mocap_data.binary")
+
+class NatnetFileConfig(bpy.types.PropertyGroup):
+  @classmethod
+  def register(cls):
+    bpy.types.Object.pyMoCapNatnetFileConfig = bpy.props.PointerProperty(
+      name="PyMoCap Config",
+      description="Object-specific PyMoCap connection configuration",
+      type=cls)
+
+    # Add in the properties
+    cls.enabled = bpy.props.BoolProperty(name="enabled", default=False, description="Enable PyMoCap")
+    cls.file = bpy.props.StringProperty(name="file", default="recording.binary")
     cls.loop = bpy.props.BoolProperty(name="loop", default=True, description="Loop back to start after reaching the end of mocap file")
     cls.sync = bpy.props.BoolProperty(name="sync", default=True, description="Synchronise mocap data using the embedded timestamps")
+
 
 def register():
   bpy.utils.register_module(__name__)

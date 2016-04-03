@@ -64,3 +64,4 @@ target/
 data/*.binary
 releases/*
 setup.py
+*.blend1
