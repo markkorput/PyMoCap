@@ -3,7 +3,7 @@ from pymocap.manager import Manager
 from pymocap.color_terminal import ColorTerminal
 from pymocap.readers.natnet_file_reader import NatnetFileReader
 from pymocap.writers.osc_writer import OscWriter
-from pymocap.gui.play_view import PlayView
+from pymocap.gui.player_view import PlayerView
 
 import Tkinter as tk
 import os
@@ -20,7 +20,7 @@ class App(tk.Frame):
         self.grid()
 
         self.master.title('PyMoCap Player v1.0')
-        self.playView = PlayView(parent=self, reader=self.reader, writer=self.writer)
+        self.playerView = PlayerView(parent=self, reader=self.reader, writer=self.writer)
         # self.lift()
         self.reader.start()
         self.update()

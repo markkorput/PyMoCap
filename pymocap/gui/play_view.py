@@ -5,10 +5,9 @@ import Tkinter as tk
 import tkFileDialog
 
 class PlayView:
-    def __init__(self, parent, reader, writer):
+    def __init__(self, parent, reader):
         self.parent = parent
         self.reader = reader
-        self.writer = writer
         self.setup()
 
     def setup(self):
@@ -24,11 +23,11 @@ class PlayView:
 
         # grid/positions
         self.frame.grid()
-        self.file_label.grid(column=0, row=0, columnspan=3)
-        self.time_label.grid(column=1, row=1)
-        self.load_button.grid(column=0, row=2)
-        self.startstop_button.grid(column=1, row=2)
-        self.quitButton.grid(column=2, row=2)
+        self.file_label.grid(column=0, row=1, columnspan=3)
+        self.time_label.grid(column=1, row=2)
+        self.load_button.grid(column=0, row=3)
+        self.startstop_button.grid(column=1, row=3)
+        self.quitButton.grid(column=2, row=3)
 
 
         #
