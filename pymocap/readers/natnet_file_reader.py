@@ -80,7 +80,7 @@ class NatnetFileReader:
 
     def configure(self, options):
         previous_options = self.options
-        self.options = dict(previous_options.items() + options.items())
+        self.options.update(options)
 
         if 'loop' in options:
             self.natnet_file.setLoop(options['loop'])

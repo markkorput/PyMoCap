@@ -13,12 +13,23 @@ bl_info = {
 
 # blender python interface
 import bpy
+from bpy.app.handlers import persistent
 import logging
 import mathutils
 
 # MoCapBridge package
 from pymocap.manager import Manager
+from pymocap.readers.natnet_reader import NatnetReader
 from pymocap.readers.natnet_file_reader import NatnetFileReader
+
+# lgobal shared manager
+manager = None
+
+def setup():
+    logging.getLogger().debug('PyMoCap.setup')
+    global manager
+    manager = Manager()
+    bpy.app.handlers.game_post.append(destroy)
 
 # This method should be called by a controller in the blender object's
 # game logic and that controller should be triggered by an 'always' sensor,
@@ -27,7 +38,13 @@ def update(controller):
     owner = controller.owner
     PyMoCap.for_owner(owner).update()
 
-manager = Manager()
+@persistent
+def destroy(scene):
+    logging.getLogger().debug('PyMoCap.destroy')
+
+    for instance in PyMoCap._instances_by_owner.values():
+        instance.destroy()
+        PyMoCap._instances_by_owner = {}
 
 class PyMoCap:
     _instances_by_owner = {}
@@ -45,15 +62,21 @@ class PyMoCap:
     def __init__(self, owner):
         global manager
         self.owner = owner
+
         self.config = bpy.data.objects[self.owner.name].pyMoCapConfig
+        self.natnet_config = bpy.data.objects[self.owner.name].pyMoCapNatnetConfig
         self.natnet_file_config = bpy.data.objects[self.owner.name].pyMoCapNatnetFileConfig
         self.spawner_config = bpy.data.objects[self.owner.name].pyMoCapSpawnerConfig
+
         self.manager = manager
         self.frameQueue = []
         self.spawnedObjects = []
 
         if not self.config.enabled:
             return
+
+        if self.natnet_config.enabled:
+            self.natnet_reader = NatnetReader(manager=self.manager, host=self.natnet_config.host, multicast=self.natnet_config.multicast, port=self.natnet_config.port)
 
         if self.natnet_file_config.enabled:
             self.file_reader = NatnetFileReader({
@@ -65,9 +88,19 @@ class PyMoCap:
         if self.spawner_config.enabled:
             self.manager.frameEvent += self.onFrame
 
+    def __del__(self):
+        self.destroy()
+
+    def destroy(self):
+        if hasattr(self, 'natnet_reader'):
+            self.natnet_reader.stop()
+
     def update(self):
         if not self.config.enabled:
             return
+
+        if self.natnet_config.enabled:
+            self.natnet_reader.update()
 
         if self.natnet_file_config.enabled:
             self.file_reader.update()
@@ -86,6 +119,7 @@ class PyMoCap:
         # remove rigid bodies that have been removed
         for i in range(len(self.spawnedObjects) - len(frame.rigid_bodies)):
             logging.getLogger().debug("TODO: remove spawned object")
+            self.spawnedObjects[-1].endObject()
             self.spawnedObjects.pop()
 
         # spawn objects
@@ -121,8 +155,10 @@ class Panel(bpy.types.Panel):
         config = context.object.pyMoCapConfig
 
         if config.enabled == True:
+            self.draw_natnet(context)
             self.draw_natnet_file(context)
             self.draw_spawner(context)
+
 
             obj = PyMoCapObj(context.object)
             # game logic connection not complete; inform user and provide
@@ -145,6 +181,15 @@ class Panel(bpy.types.Panel):
               msgs.append('Connection: NO')
               layout.row().label(text=', '.join(msgs))
               layout.row().operator("object.pymocap_config_game_logic", text="Configure")
+
+    def draw_natnet(self, context):
+        config = context.object.pyMoCapNatnetConfig
+        self.layout.row().prop(config, 'enabled', text='Natnet Receiver')
+        if config.enabled:
+            box = self.layout.box()
+            box.row().prop(config, "host")
+            box.row().prop(config, "multicast")
+            box.row().prop(config, "port")
 
     def draw_natnet_file(self, context):
         config = context.object.pyMoCapNatnetFileConfig
@@ -255,6 +300,21 @@ class Config(bpy.types.PropertyGroup):
     # Add in the properties
     cls.enabled = bpy.props.BoolProperty(name="enabled", default=False, description="Enable PyMoCap")
 
+# This class represents the config data (that the UI Panel interacts with)
+class NatnetConfig(bpy.types.PropertyGroup):
+  @classmethod
+  def register(cls):
+    bpy.types.Object.pyMoCapNatnetConfig = bpy.props.PointerProperty(
+      name="PyMoCap Natnet Config",
+      description="Object-specific PyMoCap Natnet connection configuration",
+      type=cls)
+
+    # Add in the properties
+    cls.enabled = bpy.props.BoolProperty(name="enabled", default=True, description="Enable PyMoCap Natnet Receiver")
+    cls.host = bpy.props.StringProperty(name="Host", default="0.0.0.0")
+    cls.multicast = bpy.props.StringProperty(name="Multicast", default='239.255.42.99')
+    cls.port = bpy.props.IntProperty(name="Port", default=1511, soft_min=0)
+
 class NatnetFileConfig(bpy.types.PropertyGroup):
   @classmethod
   def register(cls):
@@ -279,7 +339,7 @@ class SpawnerConfig(bpy.types.PropertyGroup):
       type=cls)
 
     # Add in the properties
-    cls.enabled = bpy.props.BoolProperty(name="enabled", default=False, description="Enable PyMoCap Spawner for this object")
+    cls.enabled = bpy.props.BoolProperty(name="enabled", default=True, description="Enable PyMoCap Spawner for this object")
     cls.object = bpy.props.StringProperty(name="object", default="", description="Object to spawn for every MoCap rigid body")
 
 def register():
@@ -290,3 +350,5 @@ def unregister():
 
 if __name__ == "__main__":
   register()
+
+setup()
