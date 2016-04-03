@@ -1,9 +1,10 @@
 import Tkinter as tk
 
 class OscView:
-    def __init__(self, parent, writer):
+    def __init__(self, parent, writer, dummy_line=False):
         self.parent = parent
         self.writer = writer
+        self.dummy_line = dummy_line
         self.setup()
 
     def __del__(self):
@@ -21,7 +22,8 @@ class OscView:
         self.port_label = tk.Label(self.frame, text="Port")
         self.port_entry = tk.Entry(self.frame, width=5)
         self.status_label = tk.Label(self.frame, text='')
-        self.dummy_label = tk.Label(self.frame, text='')
+        if self.dummy_line:
+            self.dummy_label = tk.Label(self.frame, text='')
         self.connect_button = tk.Button(self.frame, text='(re-)connect', command=self.onConnectButton)
         self.disconnect_button = tk.Button(self.frame, text='disconnect', command=self.onDisconnectButton)
 
@@ -31,7 +33,8 @@ class OscView:
         self.port_label.grid(column=0, row=1, sticky=tk.E)
         self.port_entry.grid(column=1, row=1, sticky=tk.W)
         self.status_label.grid(column=0, row=2, columnspan=3, padx=10, pady=10)
-        self.dummy_label.grid(column=0, row=3, columnspan=3, padx=10, pady=10)
+        if self.dummy_line:
+            self.dummy_label.grid(column=0, row=3, columnspan=3, padx=10, pady=10)
         self.connect_button.grid(column=0, row=4, sticky=tk.E)
         self.disconnect_button.grid(column=1, row=4, sticky=tk.W)
 
