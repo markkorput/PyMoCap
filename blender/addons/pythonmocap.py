@@ -70,7 +70,7 @@ class PyMoCap:
         self.rb_follower_config = bpy.data.objects[self.owner.name].pyMoCapRbFollowerConfig
 
         self.manager = manager
-        self.frameQueue = []
+        self.newFrame = False
         self.spawnedObjects = []
 
         if not self.config.enabled:
@@ -95,6 +95,9 @@ class PyMoCap:
         if hasattr(self, 'natnet_reader'):
             self.natnet_reader.stop()
 
+        if hasattr(self, 'file_reader'):
+            self.file_reader.stop()
+
     def update(self):
         if not self.config.enabled:
             return
@@ -106,14 +109,13 @@ class PyMoCap:
             self.file_reader.update()
             # print("NatnetFileReader time: {0}".format(self.reader.getTime()))
 
-        for frame in self.frameQueue:
-            self._processFrame(frame)
-
-        self.frameQueue = []
+        if self.newFrame:
+            self._processFrame(self.manager.frame)
+            self.newFrame = False
 
     def onFrame(self, frame, manager):
         # add frame to queue for processing in update method
-        self.frameQueue.append(frame)
+        self.newFrame = True
 
     def _processFrame(self, frame):
         # spawn/unspawn objects so there is exactly one instance
@@ -142,9 +144,10 @@ class PyMoCap:
                 obj.localOrientation = mathutils.Quaternion(rigid_body.orientation)
 
             # update object if it is following the current rigid body
-            if self.rb_follower_config.enabled and int(rigid_body.id) == int(self.rb_follower_config.rbid):
-                self.owner.localPosition = rigid_body.position
-                self.owner.localOrientation = rigid_body.orientation
+            if self.rb_follower_config.enabled:
+                if int(self.rb_follower_config.rbindex) == idx or (int(rigid_body.id) == int(self.rb_follower_config.rbid) or (int(self.rb_follower_config.rbid) == -1 and idx==0)):
+                    self.owner.localPosition = rigid_body.position
+                    self.owner.localOrientation = rigid_body.orientation
 
 
 # This class is in charge of the blender UI config panel
@@ -222,7 +225,9 @@ class Panel(bpy.types.Panel):
         config = context.object.pyMoCapRbFollowerConfig
         self.layout.row().prop(config, 'enabled', text='RigidBody Follower')
         if config.enabled:
-            box = self.layout.box().row().prop(config, "rbid")
+            box = self.layout.box()
+            box.row().prop(config, "rbid")
+            box.row().prop(config, "rbindex")
 
 
 # This class provides PyMoCap-related information (read-only)
@@ -357,7 +362,8 @@ class RbFollowerConfig(bpy.types.PropertyGroup):
 
     # Add in the properties
     cls.enabled = bpy.props.BoolProperty(name="enabled", default=False, description="Enable PyMoCap RigidBody Follower for this object")
-    cls.rbid = bpy.props.IntProperty(name="Rigid Body Id", default=1, description="Id of rigid body to follow")
+    cls.rbid = bpy.props.IntProperty(name="Rigid Body Id", default=0, description="Id of rigid body to follow. 0 means disabled", soft_min=0)
+    cls.rbindex = bpy.props.IntProperty(name="Rigid Body Index", default=-1, description="Index of rigid body to follow. -1 means diabled", soft_min=0)
 
 
 # This class represents the config data (that the UI Panel interacts with)
