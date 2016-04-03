@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-import _localpaths
-
 from pymocap.manager import Manager
 from pymocap.color_terminal import ColorTerminal
 from pymocap.readers.natnet_file_reader import NatnetFileReader
@@ -15,7 +13,7 @@ class App(tk.Frame):
         self.counter = 0
         self.manager = Manager()
         self.writer = OscWriter({'manager': self.manager})
-        defaultfile = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'walk-198frames.binary.recording'))
+        defaultfile = 'walk-198frames.binary.recording'
         self.reader = NatnetFileReader({'path': defaultfile, 'manager': self.manager, 'autoStart': False})
 
         tk.Frame.__init__(self, master, padx=10, pady=10)
@@ -23,6 +21,8 @@ class App(tk.Frame):
 
         self.master.title('PyMoCap Player v1.0')
         self.playView = PlayView(parent=self, reader=self.reader, writer=self.writer)
+        # self.lift()
+        self.reader.start()
         self.update()
 
     def update(self):
