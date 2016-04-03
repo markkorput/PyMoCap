@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-import _localpaths
-
 from pymocap.manager import Manager
 from pymocap.color_terminal import ColorTerminal
 from pymocap.readers.natnet_reader import NatnetReader

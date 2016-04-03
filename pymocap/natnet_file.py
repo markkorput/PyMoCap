@@ -29,7 +29,7 @@ class NatnetFile:
 
         try:
             if not self.path:
-                self.path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'walk-198frames.binary.recording'))
+                self.path = 'walk-198frames.binary.recording'
 
             self.read_file = open(self.path, 'rb')
             ColorTerminal().success("NatnetFile opened: %s" % self.path)
@@ -47,7 +47,7 @@ class NatnetFile:
         self.stopWriting()
         try:
             if not self.path:
-                self.path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'natnet_'+datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+'.binary'))
+                self.path = 'natnet_'+datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+'.binary'
 
             self.write_file = open(self.path, 'wb')
             ColorTerminal().success("NatnetFile opened for writing: %s" % self.path)
