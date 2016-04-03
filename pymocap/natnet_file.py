@@ -47,7 +47,7 @@ class NatnetFile:
         self.stopWriting()
         try:
             if not self.path:
-                self.path = 'natnet_'+datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+'.binary'
+                self.path = '/tmp/natnet_'+datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+'.binary'
 
             self.write_file = open(self.path, 'wb')
             ColorTerminal().success("NatnetFile opened for writing: %s" % self.path)
