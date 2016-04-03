@@ -13,6 +13,8 @@ bl_info = {
 
 # blender python interface
 import bpy
+import logging
+import mathutils
 
 # MoCapBridge package
 from pymocap.manager import Manager
@@ -45,13 +47,60 @@ class PyMoCap:
         self.owner = owner
         self.config = bpy.data.objects[self.owner.name].pyMoCapConfig
         self.natnet_file_config = bpy.data.objects[self.owner.name].pyMoCapNatnetFileConfig
+        self.spawner_config = bpy.data.objects[self.owner.name].pyMoCapSpawnerConfig
         self.manager = manager
-        self.reader = NatnetFileReader({'path': self.natnet_file_config.file, 'manager': self.manager, 'loop': self.natnet_file_config.loop, 'autoStart': self.natnet_file_config.enabled})
+        self.frameQueue = []
+        self.spawnedObjects = []
+
+        if not self.config.enabled:
+            return
+
+        if self.natnet_file_config.enabled:
+            self.file_reader = NatnetFileReader({
+                'path': self.natnet_file_config.file,
+                'manager': self.manager,
+                'loop': self.natnet_file_config.loop,
+                'sync':self.natnet_file_config.sync})
+
+        if self.spawner_config.enabled:
+            self.manager.frameEvent += self.onFrame
 
     def update(self):
+        if not self.config.enabled:
+            return
+
         if self.natnet_file_config.enabled:
-            self.reader.update()
-            print("NatnetFileReader time: {0}".format(self.reader.getTime()))
+            self.file_reader.update()
+            # print("NatnetFileReader time: {0}".format(self.reader.getTime()))
+
+        for frame in self.frameQueue:
+            self._processFrame(frame)
+
+        self.frameQueue = []
+
+    def onFrame(self, frame, manager):
+        # add frame to queue for processing in update method
+        self.frameQueue.append(frame)
+
+    def _processFrame(self, frame):
+        # remove rigid bodies that have been removed
+        for i in range(len(self.spawnedObjects) - len(frame.rigid_bodies)):
+            logging.getLogger().debug("TODO: remove spawned object")
+            self.spawnedObjects.pop()
+
+        # spawn objects
+        for i in range(len(frame.rigid_bodies) - len(self.spawnedObjects)):
+            logging.getLogger().debug("Spawning MoCap object")
+            object = self.owner.scene.addObject(self.spawner_config.object, self.spawner_config.object)
+            object.setParent(self.owner)
+            self.spawnedObjects.append(object)
+
+        # at this point self.spawnedObjects should have the same amount of objects
+        # as there are rigid bodies in the frame
+        for idx, rigid_body in enumerate(frame.rigid_bodies):
+            obj = self.spawnedObjects[idx]
+            obj.localPosition = rigid_body.position
+            obj.localOrientation = mathutils.Quaternion(rigid_body.orientation)
 
 # This class is in charge of the blender UI config panel
 class Panel(bpy.types.Panel):
@@ -72,14 +121,8 @@ class Panel(bpy.types.Panel):
         config = context.object.pyMoCapConfig
 
         if config.enabled == True:
-            natnet_file_config = context.object.pyMoCapNatnetFileConfig
-            r = layout.row()
-            r.prop(natnet_file_config, 'enabled', text='Natnet File Reader')
-            if natnet_file_config.enabled:
-                layout.row().prop(natnet_file_config, "file")
-                r = layout.row()
-                r.prop(natnet_file_config, "loop")
-                r.prop(natnet_file_config, "sync")
+            self.draw_natnet_file(context)
+            self.draw_spawner(context)
 
             obj = PyMoCapObj(context.object)
             # game logic connection not complete; inform user and provide
@@ -102,6 +145,22 @@ class Panel(bpy.types.Panel):
               msgs.append('Connection: NO')
               layout.row().label(text=', '.join(msgs))
               layout.row().operator("object.pymocap_config_game_logic", text="Configure")
+
+    def draw_natnet_file(self, context):
+        config = context.object.pyMoCapNatnetFileConfig
+        self.layout.row().prop(config, 'enabled', text='Natnet File Reader')
+        if config.enabled:
+            box = self.layout.box()
+            box.row().prop(config, "file")
+            r = box.row()
+            r.prop(config, "loop")
+            r.prop(config, "sync")
+
+    def draw_spawner(self, context):
+        config = context.object.pyMoCapSpawnerConfig
+        self.layout.row().prop(config, 'enabled', text='Spawner')
+        if config.enabled:
+            box = self.layout.box().row().prop(config, "object")
 
 
 # This class provides PyMoCap-related information (read-only)
@@ -200,7 +259,7 @@ class NatnetFileConfig(bpy.types.PropertyGroup):
   @classmethod
   def register(cls):
     bpy.types.Object.pyMoCapNatnetFileConfig = bpy.props.PointerProperty(
-      name="PyMoCap Config",
+      name="PyMoCap Natnet File Config",
       description="Object-specific PyMoCap connection configuration",
       type=cls)
 
@@ -210,6 +269,18 @@ class NatnetFileConfig(bpy.types.PropertyGroup):
     cls.loop = bpy.props.BoolProperty(name="loop", default=True, description="Loop back to start after reaching the end of mocap file")
     cls.sync = bpy.props.BoolProperty(name="sync", default=True, description="Synchronise mocap data using the embedded timestamps")
 
+# This class represents the config data (that the UI Panel interacts with)
+class SpawnerConfig(bpy.types.PropertyGroup):
+  @classmethod
+  def register(cls):
+    bpy.types.Object.pyMoCapSpawnerConfig = bpy.props.PointerProperty(
+      name="PyMoCap Spawner Config",
+      description="Object-specific PyMoCap Spawner configuration",
+      type=cls)
+
+    # Add in the properties
+    cls.enabled = bpy.props.BoolProperty(name="enabled", default=False, description="Enable PyMoCap Spawner for this object")
+    cls.object = bpy.props.StringProperty(name="object", default="", description="Object to spawn for every MoCap rigid body")
 
 def register():
   bpy.utils.register_module(__name__)
