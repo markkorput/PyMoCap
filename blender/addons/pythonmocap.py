@@ -67,6 +67,7 @@ class PyMoCap:
         self.natnet_config = bpy.data.objects[self.owner.name].pyMoCapNatnetConfig
         self.natnet_file_config = bpy.data.objects[self.owner.name].pyMoCapNatnetFileConfig
         self.spawner_config = bpy.data.objects[self.owner.name].pyMoCapSpawnerConfig
+        self.rb_follower_config = bpy.data.objects[self.owner.name].pyMoCapRbFollowerConfig
 
         self.manager = manager
         self.frameQueue = []
@@ -85,8 +86,7 @@ class PyMoCap:
                 'loop': self.natnet_file_config.loop,
                 'sync':self.natnet_file_config.sync})
 
-        if self.spawner_config.enabled:
-            self.manager.frameEvent += self.onFrame
+        self.manager.frameEvent += self.onFrame
 
     def __del__(self):
         self.destroy()
@@ -116,25 +116,36 @@ class PyMoCap:
         self.frameQueue.append(frame)
 
     def _processFrame(self, frame):
-        # remove rigid bodies that have been removed
-        for i in range(len(self.spawnedObjects) - len(frame.rigid_bodies)):
-            logging.getLogger().debug("TODO: remove spawned object")
-            self.spawnedObjects[-1].endObject()
-            self.spawnedObjects.pop()
+        # spawn/unspawn objects so there is exactly one instance
+        # of the specified object for each rigid body in the frame
+        if self.spawner_config.enabled:
+            # remove rigid bodies that have been removed
+            for i in range(len(self.spawnedObjects) - len(frame.rigid_bodies)):
+                logging.getLogger().debug("TODO: remove spawned object")
+                self.spawnedObjects[-1].endObject()
+                self.spawnedObjects.pop()
 
-        # spawn objects
-        for i in range(len(frame.rigid_bodies) - len(self.spawnedObjects)):
-            logging.getLogger().debug("Spawning MoCap object")
-            object = self.owner.scene.addObject(self.spawner_config.object, self.spawner_config.object)
-            object.setParent(self.owner)
-            self.spawnedObjects.append(object)
+            # spawn objects
+            for i in range(len(frame.rigid_bodies) - len(self.spawnedObjects)):
+                logging.getLogger().debug("Spawning MoCap object")
+                object = self.owner.scene.addObject(self.spawner_config.object, self.spawner_config.object)
+                object.setParent(self.owner)
+                self.spawnedObjects.append(object)
 
         # at this point self.spawnedObjects should have the same amount of objects
         # as there are rigid bodies in the frame
         for idx, rigid_body in enumerate(frame.rigid_bodies):
-            obj = self.spawnedObjects[idx]
-            obj.localPosition = rigid_body.position
-            obj.localOrientation = mathutils.Quaternion(rigid_body.orientation)
+            # re-config all objects with updated rigid bodies data
+            if self.spawner_config.enabled:
+                obj = self.spawnedObjects[idx]
+                obj.localPosition = rigid_body.position
+                obj.localOrientation = mathutils.Quaternion(rigid_body.orientation)
+
+            # update object if it is following the current rigid body
+            if self.rb_follower_config.enabled and int(rigid_body.id) == int(self.rb_follower_config.rbid):
+                self.owner.localPosition = rigid_body.position
+                self.owner.localOrientation = rigid_body.orientation
+
 
 # This class is in charge of the blender UI config panel
 class Panel(bpy.types.Panel):
@@ -158,7 +169,7 @@ class Panel(bpy.types.Panel):
             self.draw_natnet(context)
             self.draw_natnet_file(context)
             self.draw_spawner(context)
-
+            self.draw_rb_follower(context)
 
             obj = PyMoCapObj(context.object)
             # game logic connection not complete; inform user and provide
@@ -206,6 +217,12 @@ class Panel(bpy.types.Panel):
         self.layout.row().prop(config, 'enabled', text='Spawner')
         if config.enabled:
             box = self.layout.box().row().prop(config, "object")
+
+    def draw_rb_follower(self, context):
+        config = context.object.pyMoCapRbFollowerConfig
+        self.layout.row().prop(config, 'enabled', text='RigidBody Follower')
+        if config.enabled:
+            box = self.layout.box().row().prop(config, "rbid")
 
 
 # This class provides PyMoCap-related information (read-only)
@@ -310,7 +327,7 @@ class NatnetConfig(bpy.types.PropertyGroup):
       type=cls)
 
     # Add in the properties
-    cls.enabled = bpy.props.BoolProperty(name="enabled", default=True, description="Enable PyMoCap Natnet Receiver")
+    cls.enabled = bpy.props.BoolProperty(name="enabled", default=False, description="Enable PyMoCap Natnet Receiver")
     cls.host = bpy.props.StringProperty(name="Host", default="0.0.0.0")
     cls.multicast = bpy.props.StringProperty(name="Multicast", default='239.255.42.99')
     cls.port = bpy.props.IntProperty(name="Port", default=1511, soft_min=0)
@@ -330,6 +347,20 @@ class NatnetFileConfig(bpy.types.PropertyGroup):
     cls.sync = bpy.props.BoolProperty(name="sync", default=True, description="Synchronise mocap data using the embedded timestamps")
 
 # This class represents the config data (that the UI Panel interacts with)
+class RbFollowerConfig(bpy.types.PropertyGroup):
+  @classmethod
+  def register(cls):
+    bpy.types.Object.pyMoCapRbFollowerConfig = bpy.props.PointerProperty(
+      name="PyMoCap Spawner Config",
+      description="Object-specific PyMoCap RbFollower configuration",
+      type=cls)
+
+    # Add in the properties
+    cls.enabled = bpy.props.BoolProperty(name="enabled", default=False, description="Enable PyMoCap RigidBody Follower for this object")
+    cls.rbid = bpy.props.IntProperty(name="Rigid Body Id", default=1, description="Id of rigid body to follow")
+
+
+# This class represents the config data (that the UI Panel interacts with)
 class SpawnerConfig(bpy.types.PropertyGroup):
   @classmethod
   def register(cls):
@@ -339,7 +370,7 @@ class SpawnerConfig(bpy.types.PropertyGroup):
       type=cls)
 
     # Add in the properties
-    cls.enabled = bpy.props.BoolProperty(name="enabled", default=True, description="Enable PyMoCap Spawner for this object")
+    cls.enabled = bpy.props.BoolProperty(name="enabled", default=False, description="Enable PyMoCap Spawner for this object")
     cls.object = bpy.props.StringProperty(name="object", default="", description="Object to spawn for every MoCap rigid body")
 
 def register():
