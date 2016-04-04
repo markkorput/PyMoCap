@@ -232,8 +232,17 @@ class Panel(bpy.types.Panel):
         self.layout.row().prop(config, 'enabled', text='RigidBody Follower')
         if config.enabled:
             box = self.layout.box()
-            box.row().prop(config, "rbid")
-            box.row().prop(config, "rbindex")
+            r = box.row()
+            r.prop(config, "rbid")
+            txt = 'Disabled' if config.rbid == 0 else 'To disable, enter 0 (zero)'
+            r.label(txt)
+            r = box.row()
+            txt = 'Disabled' if config.rbindex == -1 else 'To disable, enter -1'
+            r.prop(config, "rbindex")
+            r.label(txt)
+            if config.rbid != 0 and config.rbindex != -1:
+                box.row().label('Only one of the two should be enabled')
+
 
 
 # This class provides PyMoCap-related information (read-only)
