@@ -16,11 +16,13 @@ import bpy
 from bpy.app.handlers import persistent
 import logging
 import mathutils
+import os.path
 
 # MoCapBridge package
 from pymocap.manager import Manager
 from pymocap.readers.natnet_reader import NatnetReader
 from pymocap.readers.natnet_file_reader import NatnetFileReader
+
 
 # lgobal shared manager
 manager = None
@@ -81,7 +83,7 @@ class PyMoCap:
 
         if self.natnet_file_config.enabled:
             self.file_reader = NatnetFileReader({
-                'path': self.natnet_file_config.file,
+                'path': bpy.path.abspath(self.natnet_file_config.file),
                 'manager': self.manager,
                 'loop': self.natnet_file_config.loop,
                 'sync':self.natnet_file_config.sync})
@@ -207,10 +209,14 @@ class Panel(bpy.types.Panel):
 
     def draw_natnet_file(self, context):
         config = context.object.pyMoCapNatnetFileConfig
+        obj = PyMoCapObj(context.object)
+
         self.layout.row().prop(config, 'enabled', text='Natnet File Reader')
         if config.enabled:
             box = self.layout.box()
             box.row().prop(config, "file")
+            if not obj.natnetFileExists():
+                box.row().label(text='File could not be found')
             r = box.row()
             r.prop(config, "loop")
             r.prop(config, "sync")
@@ -267,6 +273,12 @@ class PyMoCapObj:
             if controller.type == 'PYTHON' and controller.mode == 'MODULE' and controller.module == 'pythonmocap.update':
                 return controller
         return None
+
+    def fullNatnetFilePath(self):
+        return bpy.path.abspath(self.object.pyMoCapNatnetFileConfig.file)
+
+    def natnetFileExists(self):
+        return os.path.isfile(self.fullNatnetFilePath())
 
 class PyMoCapConfigGameLogicOperator(bpy.types.Operator):
     bl_idname = "object.pymocap_config_game_logic"
@@ -347,7 +359,7 @@ class NatnetFileConfig(bpy.types.PropertyGroup):
 
     # Add in the properties
     cls.enabled = bpy.props.BoolProperty(name="enabled", default=False, description="Enable PyMoCap")
-    cls.file = bpy.props.StringProperty(name="file", default="recording.binary")
+    cls.file = bpy.props.StringProperty(name="file", default="recording.binary", subtype="FILE_PATH")
     cls.loop = bpy.props.BoolProperty(name="loop", default=True, description="Loop back to start after reaching the end of mocap file")
     cls.sync = bpy.props.BoolProperty(name="sync", default=True, description="Synchronise mocap data using the embedded timestamps")
 

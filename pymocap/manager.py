@@ -4,7 +4,7 @@ from pymocap.color_terminal import ColorTerminal
 try:
     import optirx as rx
 except ImportError:
-    ColorTerminal().warn("importing embedded version of the optirx library")
+    ColorTerminal().warn("importing embedded version of the optirx library for PyMoCap.Manager")
     import pymocap.dependencies.optirx as rx
 
 class Manager:
