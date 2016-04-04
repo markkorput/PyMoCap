@@ -2,7 +2,7 @@
 bl_info = {
     "name": "PyMoCap",
     "author": "Short Notion (Mark van de Korput)",
-    "version": (0, 1),
+    "version": (1, 0, 0),
     "blender": (2, 75, 0),
     "location": "View3D > T-panel > Object Tools",
     "description": "Use real time NatNet MoCap data in your blender game project",
